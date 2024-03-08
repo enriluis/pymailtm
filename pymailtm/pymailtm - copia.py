@@ -70,6 +70,18 @@ class Account:
                                                     self.id_), headers=self.auth_headers)
         return r.status_code == 204
 
+    def wait_for_message(self):
+        """Wait for a new message to arrive, then return it."""
+        old_messages_id = self._get_existing_messages_id()
+
+        while True:
+            sleep(2)
+            try:
+                new_messages = list(filter(lambda m: m.id_ not in old_messages_id, self.get_messages()))
+                if new_messages:
+                    return new_messages[0]
+            except CouldNotGetMessagesException:
+                pass
 
     def _get_existing_messages_id(self) -> List[int]:
         """Return the existing messages id list. This will keep trying, ignoring errors."""
@@ -80,6 +92,13 @@ class Account:
             except CouldNotGetMessagesException:
                 sleep(3)
 
+    def monitor_account(self):
+        """Keep waiting for new messages and open them in the browser."""
+        while True:
+            print("\nWaiting for new messages...")
+            new_msg = self.wait_for_message()
+            print("New message arrived!")
+            new_msg.open_web()
 
 
 @dataclass
@@ -188,6 +207,10 @@ class MailTm:
             raise CouldNotGetAccountException(f"HTTP {r.status_code}")
         return r.json()
 
+    def monitor_new_account(self, force_new=False):
+        """Create a new account and monitor it for new messages."""
+        account = self._open_account(new=force_new)
+        account.monitor_account()
 
     def _save_account(self, account: Account):
         """Save the account data for later use."""
